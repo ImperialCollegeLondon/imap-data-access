@@ -8,22 +8,29 @@ provides a convenient way to query the IMAP data archive and download data files
 import os
 from pathlib import Path
 
-from imap_data_access.file_validation import ScienceFilePath, SPICEFilePath
+from imap_data_access.file_validation import (
+    AncillaryFilePath,
+    ImapFilePath,
+    ScienceFilePath,
+    SPICEFilePath,
+)
 from imap_data_access.io import download, query, upload
 
 __all__ = [
     "query",
     "download",
     "upload",
+    "ImapFilePath",
     "ScienceFilePath",
     "SPICEFilePath",
+    "AncillaryFilePath",
     "VALID_INSTRUMENTS",
     "VALID_DATALEVELS",
     "VALID_FILE_EXTENSION",
     "FILENAME_CONVENTION",
 ]
 
-__version__ = "0.13.0"
+__version__ = "0.15.0"
 
 
 config = {

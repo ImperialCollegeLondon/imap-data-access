@@ -4,13 +4,103 @@
 from __future__ import annotations
 
 import re
+from abc import abstractmethod
 from datetime import datetime
 from pathlib import Path
 
 import imap_data_access
 
 
-class ScienceFilePath:
+def generate_imap_file_path(filename: str) -> ImapFilePath:
+    """Generate an ImapFilePath object from a filename.
+
+    This method determines if the filename is a SPICE, Science, or Ancillary file and
+    returns a SPICEFilePath, ScienceFilePath, or AncillaryFilePath object respectively.
+
+    Parameters
+    ----------
+    filename : str
+        The filename to generate a path for.
+
+    Returns
+    -------
+    A FilePath object
+    """
+    try:
+        # SPICE
+        path_obj = imap_data_access.SPICEFilePath(filename)
+    except SPICEFilePath.InvalidSPICEFileError:
+        # Science and Ancillary
+        try:
+            path_obj = imap_data_access.ScienceFilePath(filename)
+        except ScienceFilePath.InvalidScienceFileError:
+            # If Science file fails, then process as an Ancillary file
+            try:
+                path_obj = imap_data_access.AncillaryFilePath(filename)
+            except AncillaryFilePath.InvalidAncillaryFileError as e:
+                # Matches neither file format
+                error_message = (
+                    f"Invalid file type for {filename}. It does not match"
+                    f"Spice, Science or Ancillary file formats"
+                )
+                raise ValueError(error_message) from e
+
+    return path_obj
+
+
+class ImapFilePath:
+    """Base class for FilePaths.
+
+    Includes shared static methods and provides correct typing for ScienceFilePath,
+    AncillaryFilePath, and SPICEFilePath.
+    """
+
+    @staticmethod
+    def is_valid_date(input_date: str) -> bool:
+        """Check input date string is in valid format and is correct date.
+
+        Parameters
+        ----------
+        input_date : str
+            Date in YYYYMMDD format.
+
+        Returns
+        -------
+        bool
+            Whether date input is valid or not
+        """
+        # Validate if it's a real date
+        try:
+            # This checks if date is in YYYYMMDD format.
+            # Sometimes, date is correct but not in the format we want
+            datetime.strptime(input_date, "%Y%m%d")
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def is_valid_version(input_version: str) -> bool:
+        """Check input version string is in valid format 'vXXX' or 'latest'.
+
+        Parameters
+        ----------
+        input_version : str
+            Version to be checked.
+
+        Returns
+        -------
+        bool
+            Whether input version is valid or not.
+        """
+        return input_version == "latest" or re.fullmatch(r"v\d{3}", input_version)
+
+    @abstractmethod
+    def construct_path(self) -> Path:
+        """Construct valid path from class variables and data_dir."""
+        raise NotImplementedError
+
+
+class ScienceFilePath(ImapFilePath):
     """Class for building and validating filepaths for science files."""
 
     class InvalidScienceFileError(Exception):
@@ -184,61 +274,6 @@ class ScienceFilePath:
 
         return error_message
 
-    @staticmethod
-    def is_valid_date(input_date: str) -> bool:
-        """Check input date string is in valid format and is correct date.
-
-        Parameters
-        ----------
-        input_date : str
-            Date in YYYYMMDD format.
-
-        Returns
-        -------
-        bool
-            Whether date input is valid or not
-        """
-        # Validate if it's a real date
-        try:
-            # This checks if date is in YYYYMMDD format.
-            # Sometimes, date is correct but not in the format we want
-            datetime.strptime(input_date, "%Y%m%d")
-            return True
-        except ValueError:
-            return False
-
-    @staticmethod
-    def is_valid_version(input_version: str) -> bool:
-        """Check input version string is in valid format 'vXXX' or 'latest'.
-
-        Parameters
-        ----------
-        input_version : str
-            Version to be checked.
-
-        Returns
-        -------
-        bool
-            Whether input version is valid or not.
-        """
-        return input_version == "latest" or re.fullmatch(r"v\d{3}", input_version)
-
-    @staticmethod
-    def is_valid_repointing(input_repointing: str) -> bool:
-        """Check input repointing string is in valid format 'repointingXXXXX'.
-
-        Parameters
-        ----------
-        input_repointing : str
-            Repointing to be checked.
-
-        Returns
-        -------
-        bool
-            Whether input repointing is valid or not.
-        """
-        return re.fullmatch(r"repoint\d{5}", str(input_repointing))
-
     def construct_path(self) -> Path:
         """Construct valid path from class variables and data_dir.
 
@@ -309,6 +344,22 @@ class ScienceFilePath:
             components["repointing"] = int(components["repointing"])
         return components
 
+    @staticmethod
+    def is_valid_repointing(input_repointing: str) -> bool:
+        """Check input repointing string is in valid format 'repointingXXXXX'.
+
+        Parameters
+        ----------
+        input_repointing : str
+            Repointing to be checked.
+
+        Returns
+        -------
+        bool
+            Whether input repointing is valid or not.
+        """
+        return re.fullmatch(r"repoint\d{5}", str(input_repointing))
+
 
 # Transform the suffix to the directory structure we are using
 # Commented out mappings are not being used on IMAP
@@ -346,7 +397,7 @@ https://naif.jpl.nasa.gov/pub/naif/toolkit_docs/C/req/kernel.html
 """
 
 
-class SPICEFilePath:
+class SPICEFilePath(ImapFilePath):
     """Class for building and validating filepaths for SPICE files."""
 
     class InvalidSPICEFileError(Exception):
@@ -399,7 +450,7 @@ class SPICEFilePath:
         return spice_dir / subdir / self.filename
 
 
-class AncillaryFilePath(ScienceFilePath):
+class AncillaryFilePath(ImapFilePath):
     """Class for building and validating filepaths for Ancillary files."""
 
     class InvalidAncillaryFileError(Exception):
@@ -415,12 +466,12 @@ class AncillaryFilePath(ScienceFilePath):
         path is set by the "IMAP_DATA_DIR" environment variable, or defaults to "data/"
 
         Current filename convention:
-        "<mission>_<instrument>_<description>_<start_date>(-<end_date>)_
+        "<mission>_<instrument>_<descriptor>_<start_date>(-<end_date>)_
         <version>.<extension>"
 
         <mission>: imap
         <instrument>: codice, glows, hi, hit, idex, lo, mag, swapi, swe, ultra
-        <description>: A descriptive name for the ancillary file which
+        <descriptor>: A descriptive name for the ancillary file which
                        distinguishes between other ancillary files used by the
                        instrument.
         <start_date>: startdate is the earliest date where the file is valid,
@@ -449,7 +500,7 @@ class AncillaryFilePath(ScienceFilePath):
 
         self.mission = split_filename["mission"]
         self.instrument = split_filename["instrument"]
-        self.description = split_filename["description"]
+        self.descriptor = split_filename["descriptor"]
         self.start_date = split_filename["start_date"]
         self.end_date = split_filename["end_date"]
         self.version = split_filename["version"]
@@ -463,7 +514,7 @@ class AncillaryFilePath(ScienceFilePath):
     def generate_from_inputs(
         cls,
         instrument: str,
-        description: str,
+        descriptor: str,
         version: str,
         extension: str,
         start_time: str,
@@ -482,7 +533,7 @@ class AncillaryFilePath(ScienceFilePath):
         ----------
         instrument : str
             The instrument for the filename.
-        description : str
+        descriptor : str
             The descriptor for the ancillary filename.
         version : str
             The version of the data.
@@ -503,12 +554,12 @@ class AncillaryFilePath(ScienceFilePath):
         """
         if end_time:
             filename = (
-                f"imap_{instrument}_{description}_{start_time}-{end_time}_"
+                f"imap_{instrument}_{descriptor}_{start_time}-{end_time}_"
                 f"{version}.{extension}"
             )
         else:
             filename = (
-                f"imap_{instrument}_{description}_{start_time}_{version}.{extension}"
+                f"imap_{instrument}_{descriptor}_{start_time}_{version}.{extension}"
             )
         return cls(filename)
 
@@ -531,14 +582,14 @@ class AncillaryFilePath(ScienceFilePath):
             for attr in [
                 self.mission,
                 self.instrument,
-                self.description,
+                self.descriptor,
                 self.version,
                 self.extension,
             ]
         ):
             error_message = (
                 f"Invalid filename, missing attribute. Filename "
-                f"convention is {imap_data_access.FILENAME_CONVENTION} \n"
+                f"convention is {imap_data_access.ANCILLARY_FILENAME_CONVENTION} \n"
             )
         if self.mission != "imap":
             error_message += f"Invalid mission {self.mission}. Please use imap \n"
@@ -556,8 +607,12 @@ class AncillaryFilePath(ScienceFilePath):
 
         if not ScienceFilePath.is_valid_date(self.start_date):
             error_message += "Invalid start date format. Please use YYYYMMDD format. \n"
-        if not ScienceFilePath.is_valid_date(self.end_date):
-            error_message += "Invalid end date format. Please use YYYYMMDD format. \n"
+
+        if self.end_date:
+            if not ScienceFilePath.is_valid_date(self.end_date):
+                error_message += (
+                    "Invalid end date format. Please use YYYYMMDD format. \n"
+                )
 
         return error_message
 
@@ -587,7 +642,7 @@ class AncillaryFilePath(ScienceFilePath):
         """Extract all components from filename. Does not validate instrument or level.
 
         Will return a dictionary with the following keys:
-        { instrument, description, start_date, end_date, version, extension }
+        { instrument, descriptor, start_date, end_date, version, extension }
 
         If a match is not found, a ValueError will be raised.
 
@@ -607,11 +662,11 @@ class AncillaryFilePath(ScienceFilePath):
         pattern = (
             r"^(?P<mission>imap)_"
             r"(?P<instrument>[^_]+)_"
-            r"(?P<description>[^_]+)_"
+            r"(?P<descriptor>[^_]+)_"
             r"(?P<start_date>\d{8})"
             r"(-(?P<end_date>\d{8}))?"  # Optional end_date field
             r"_(?P<version>v\d{3})"
-            r"\.(?P<extension>cdf|cvs|json)$"
+            r"\.(?P<extension>cdf|csv|json)$"
         )
         if isinstance(filename, Path):
             filename = filename.name
