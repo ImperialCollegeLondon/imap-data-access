@@ -5,6 +5,7 @@ heliosphere. This package contains the data access tools for the IMAP mission. I
 provides a convenient way to query the IMAP data archive and download data files.
 """
 
+import importlib.metadata
 import os
 from pathlib import Path
 
@@ -17,27 +18,29 @@ from imap_data_access.file_validation import (
 from imap_data_access.io import download, query, upload
 
 __all__ = [
-    "query",
-    "download",
-    "upload",
-    "ImapFilePath",
-    "ScienceFilePath",
-    "SPICEFilePath",
-    "AncillaryFilePath",
-    "VALID_INSTRUMENTS",
+    "FILENAME_CONVENTION",
     "VALID_DATALEVELS",
     "VALID_FILE_EXTENSION",
-    "FILENAME_CONVENTION",
+    "VALID_INSTRUMENTS",
+    "AncillaryFilePath",
+    "ImapFilePath",
+    "SPICEFilePath",
+    "ScienceFilePath",
+    "download",
+    "query",
+    "upload",
 ]
 
-__version__ = "0.15.0"
-
+__version__ = importlib.metadata.version("imap-data-access")
 
 config = {
     "DATA_ACCESS_URL": os.getenv("IMAP_DATA_ACCESS_URL")
     or "https://api.dev.imap-mission.com",
     "DATA_DIR": Path(os.getenv("IMAP_DATA_DIR") or Path.cwd() / "data"),
     "API_KEY": os.getenv("IMAP_API_KEY"),
+    # Create a base64 encoded string for the username and password
+    # echo -n 'username:password' | base64
+    "WEBPODA_TOKEN": os.getenv("IMAP_WEBPODA_TOKEN"),
 }
 """Settings configuration dictionary.
 
@@ -49,17 +52,25 @@ DATA_DIR : This is where the file data is stored and organized by instrument and
 API_KEY : This is the API key used to authenticate with the data access API.
     It can be set on the command line using the --api-key option, or through the
     environment variable IMAP_API_KEY. It is only necessary for uploading files.
+WEBPODA_TOKEN : This is the token used to authenticate with the webpoda API.
+    It can be set on the command line using the --webpoda-token option, or through
+    the environment variable IMAP_WEBPODA_TOKEN. It is only necessary for downloading
+    packet data.
 """
 
 
+# NOTE: ialirt and spacecraft aren't actual instruments, but they are
+#       additional data sources for packet definitions and processing
 VALID_INSTRUMENTS = {
     "codice",
     "glows",
     "hit",
     "hi",
+    "ialirt",
     "idex",
     "lo",
     "mag",
+    "spacecraft",
     "swapi",
     "swe",
     "ultra",
@@ -77,11 +88,13 @@ VALID_DATALEVELS = {
     "l2",
     "l2a",
     "l2b",
+    "l2c",
     "l3",
     "l3a",
     "l3b",
     "l3c",
     "l3d",
+    "l3e",
 }
 
 VALID_FILE_EXTENSION = {"pkts", "cdf"}
@@ -93,7 +106,7 @@ FILENAME_CONVENTION = (
 
 ANCILLARY_FILENAME_CONVENTION = (
     "<mission>_<instrument>_<description>_"
-    "<start_date>(-<end_date>)_<version>.<extension>"
+    "<start_date>(_<end_date>)_<version>.<extension>"
 )
 
-VALID_ANCILLARY_FILE_EXTENSION = {"cdf", "csv", "json"}
+VALID_ANCILLARY_FILE_EXTENSION = {"cdf", "csv", "dat", "json", "zip"}
