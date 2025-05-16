@@ -16,22 +16,35 @@ from imap_data_access.file_validation import (
     SPICEFilePath,
 )
 from imap_data_access.io import download, query, upload
+from imap_data_access.processing_input import (
+    AncillaryInput,
+    ProcessingInputCollection,
+    RepointInput,
+    ScienceInput,
+    SPICEInput,
+    SpinInput,
+)
 
 __all__ = [
-    "FILENAME_CONVENTION",
     "VALID_DATALEVELS",
-    "VALID_FILE_EXTENSION",
     "VALID_INSTRUMENTS",
     "AncillaryFilePath",
+    "AncillaryInput",
     "ImapFilePath",
+    "ProcessingInputCollection",
+    "RepointInput",
     "SPICEFilePath",
+    "SPICEInput",
     "ScienceFilePath",
+    "ScienceInput",
+    "SpinInput",
     "download",
     "query",
     "upload",
 ]
 
 __version__ = importlib.metadata.version("imap-data-access")
+
 
 config = {
     "DATA_ACCESS_URL": os.getenv("IMAP_DATA_ACCESS_URL")
@@ -96,17 +109,3 @@ VALID_DATALEVELS = {
     "l3d",
     "l3e",
 }
-
-VALID_FILE_EXTENSION = {"pkts", "cdf"}
-
-FILENAME_CONVENTION = (
-    "<mission>_<instrument>_<datalevel>_<descriptor>_"
-    "<startdate>(-<repointing>)_<version>.<extension>"
-)
-
-ANCILLARY_FILENAME_CONVENTION = (
-    "<mission>_<instrument>_<description>_"
-    "<start_date>(_<end_date>)_<version>.<extension>"
-)
-
-VALID_ANCILLARY_FILE_EXTENSION = {"cdf", "csv", "dat", "json", "zip"}

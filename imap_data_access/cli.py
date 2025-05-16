@@ -51,25 +51,34 @@ def _print_query_results_table(query_results: list[dict]):
     if num_files == 0:
         return
 
-    # Use the keys of the first item in query_results for the header
+    # Use the query_results for the header
     headers = [
         "Instrument",
         "Data Level",
         "Descriptor",
         "Start Date",
+        "Ingestion Date",
         "Repointing",
         "Version",
         "Filename",
     ]
 
     # Calculate the maximum width for each column based on the header and the data
+    # have to adjust Ingestion Date and Filename to properly align
     column_widths = {}
     for header in headers[:-1]:
         column_widths[header] = max(
             len(header),
             *(len(str(item.get(header.lower(), ""))) for item in query_results),
         )
-        # Calculate the maximum width for each column based on the header and the data
+
+        column_widths["Ingestion Date"] = max(
+            len("Ingestion Date"),
+            *(
+                len(os.path.basename(item.get("ingestion_date", "")))
+                for item in query_results
+            ),
+        )
 
         column_widths["Filename"] = max(
             len("Filename"),
@@ -88,8 +97,8 @@ def _print_query_results_table(query_results: list[dict]):
 
     # Add hyphens for a separator between header and data
     hyphens = "|" + "-" * (sum(column_widths.values()) + 3 * len(headers) - 1) + "|"
-    print(hyphens)
 
+    print(hyphens)
     # Print header
     print(format_string.format(*headers))
     print(hyphens)
@@ -101,6 +110,7 @@ def _print_query_results_table(query_results: list[dict]):
             str(item.get("data_level", "")),
             str(item.get("descriptor", "")),
             str(item.get("start_date", "")),
+            str(item.get("ingestion_date", "")),
             str(item.get("repointing", "")) or "",
             str(item.get("version", "")),
             os.path.basename(item.get("file_path", "")),
@@ -126,6 +136,8 @@ def _query_parser(args: argparse.Namespace):
         "descriptor",
         "start_date",
         "end_date",
+        "ingestion_start_date",
+        "ingestion_end_date",
         "repointing",
         "version",
         "extension",
@@ -333,6 +345,18 @@ def main():  # noqa: PLR0915
         type=str,
         required=False,
         help="End date for a range of file timestamps in YYYYMMDD format",
+    )
+    query_parser.add_argument(
+        "--ingestion-start-date",
+        type=str,
+        required=False,
+        help="Ingestion start date for a range of file timestamps in YYYYMMDD format",
+    )
+    query_parser.add_argument(
+        "--ingestion-end-date",
+        type=str,
+        required=False,
+        help="Ingestion end date for a range of file timestamps in YYYYMMDD format",
     )
     query_parser.add_argument(
         "--repointing",
